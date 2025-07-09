@@ -12,76 +12,70 @@ import { useAtom } from "jotai";
 
 type Props = { location?: string };
 
-const API_KEY = process.env.NEXT_PUBLIC_WEATHER_KEY;
+const API_KEY =  "d6e80e2b90dd0ef6a409be0dde3d9d6d";
 
 export default function Navbar({ location }: Props) {
   const [city, setCity] = useState("");
   const [error, setError] = useState("");
   //
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
+
   const [place, setPlace] = useAtom(placeAtom);
   const [_, setLoadingCity] = useAtom(loadingCityAtom);
 
-  async function handleInputChang(value: string) {
+  function handleInputChang(value: string) {
     setCity(value);
-    if (value.length >= 3) {
-      try {
-        const response = await axios.get(
-          `https://api.openweathermap.org/data/2.5/find?q=${value}&appid=${API_KEY}`
-        );
+  }
 
-        const suggestions = response.data.list.map((item: any) => item.name);
-        setSuggestions(suggestions);
-        setError("");
-        setShowSuggestions(true);
-      } catch (error) {
-        setSuggestions([]);
-        setShowSuggestions(false);
+  async function handleSuggestionClick(value: string) {
+    // Use /weather endpoint to validate and set city
+    try {
+      const response = await axios.get(
+        `https://api.openweathermap.org/data/2.5/weather?q=${value}&appid=${API_KEY}`
+      );
+      if (response.data && response.data.name) {
+        setCity(response.data.name);
+        setPlace(response.data.name);
       }
-    } else {
-      setSuggestions([]);
-      setShowSuggestions(false);
+    } catch (error) {
+      // Do nothing on error
     }
   }
 
-  function handleSuggestionClick(value: string) {
-    setCity(value);
-    setShowSuggestions(false);
-  }
-
-  function handleSubmiSearch(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmiSearch(e: React.FormEvent<HTMLFormElement>) {
     setLoadingCity(true);
     e.preventDefault();
-    if (suggestions.length == 0) {
-      setError("Location not found");
-      setLoadingCity(false);
-    } else {
-      setError("");
-      setTimeout(() => {
-        setLoadingCity(false);
-        setPlace(city);
-        setShowSuggestions(false);
-      }, 500);
+    try {
+      const response = await axios.get(
+        `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}`
+      );
+      if (response.data && response.data.name) {
+        setPlace(response.data.name);
+      }
+    } catch (error) {
+      // Do nothing on error
     }
+    setLoadingCity(false);
   }
 
   function handleCurrentLocation() {
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(async (postiion) => {
-        const { latitude, longitude } = postiion.coords;
+      setLoadingCity(true);
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        const { latitude, longitude } = position.coords;
         try {
-          setLoadingCity(true);
           const response = await axios.get(
             `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${API_KEY}`
           );
-          setTimeout(() => {
-            setLoadingCity(false);
+          if (response.data && response.data.name) {
             setPlace(response.data.name);
-          }, 500);
+            setError("");
+          } else {
+            setError("Location not found");
+          }
         } catch (error) {
-          setLoadingCity(false);
+          setError("Location not found");
         }
+        setLoadingCity(false);
       });
     }
   }
@@ -104,20 +98,12 @@ export default function Navbar({ location }: Props) {
             <p className="text-slate-900/80 text-sm"> {location} </p>
             <div className="relative hidden md:flex">
               {/* SearchBox */}
-
               <SearchBox
                 value={city}
                 onSubmit={handleSubmiSearch}
                 onChange={(e) => handleInputChang(e.target.value)}
               />
-              <SuggetionBox
-                {...{
-                  showSuggestions,
-                  suggestions,
-                  handleSuggestionClick,
-                  error
-                }}
-              />
+              {/* No error or suggestion UI */}
             </div>
           </section>
         </div>
@@ -125,55 +111,16 @@ export default function Navbar({ location }: Props) {
       <section className="flex   max-w-7xl px-3 md:hidden ">
         <div className="relative ">
           {/* SearchBox */}
-
           <SearchBox
             value={city}
             onSubmit={handleSubmiSearch}
             onChange={(e) => handleInputChang(e.target.value)}
           />
-          <SuggetionBox
-            {...{
-              showSuggestions,
-              suggestions,
-              handleSuggestionClick,
-              error
-            }}
-          />
+          {/* No error or suggestion UI */}
         </div>
       </section>
     </>
   );
 }
 
-function SuggetionBox({
-  showSuggestions,
-  suggestions,
-  handleSuggestionClick,
-  error
-}: {
-  showSuggestions: boolean;
-  suggestions: string[];
-  handleSuggestionClick: (item: string) => void;
-  error: string;
-}) {
-  return (
-    <>
-      {((showSuggestions && suggestions.length > 1) || error) && (
-        <ul className="mb-4 bg-white absolute border top-[44px] left-0 border-gray-300 rounded-md min-w-[200px]  flex flex-col gap-1 py-2 px-2">
-          {error && suggestions.length < 1 && (
-            <li className="text-red-500 p-1 "> {error}</li>
-          )}
-          {suggestions.map((item, i) => (
-            <li
-              key={i}
-              onClick={() => handleSuggestionClick(item)}
-              className="cursor-pointer p-1 rounded   hover:bg-gray-200"
-            >
-              {item}
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
-  );
-}
+// SuggetionBox removed: no suggestions needed
